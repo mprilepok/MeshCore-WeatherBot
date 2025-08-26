@@ -5,6 +5,7 @@ import * as utils from './utils.mjs';
 
 const port = process.argv[2] ?? '/dev/ttyACM0';
 
+const weatherTime = '6:00';
 const timers = { // miliseconds
   blitzCollection: 10 * 60 * 1000, // 10 minutes
   pollWeatherAlerts: 10 * 60 * 1000, // 10 minutes
@@ -72,7 +73,7 @@ connection.on('connected', async () => {
 
   await pollWeatherAlerts();
   await registerBlitzortungMqtt(blitzHandler, blitzArea);
-  utils.setAlarm('7:23', sendWeather);
+  utils.setAlarm(weatherTime, sendWeather);
   setInterval(blitzWarning, timers.blitzCollection);
 });
 
@@ -109,22 +110,18 @@ async function pollWeatherAlerts() {
 
     await sendAlert(`[${warning.severity}][${warning.type}]: ${warning.text}`, channels.alerts);
     seen.warnings[hash] = true;
-
-    await utils.sleep(15 * 1000);
   }
 
   setTimeout(pollWeatherAlerts, timers.pollWeatherAlerts);
 }
 
 async function sendWeather(date) {
-  const currentDateString = date.toLocaleDateString('sk', { weekday: 'long', year: 'numeric', month: 'numeric', day: 'numeric' });
+  // const currentDateString = date.toLocaleDateString('sk', { weekday: 'long', year: 'numeric', month: 'numeric', day: 'numeric' });
   const chunks = utils.splitStringToByteChunks(await getWeather(), 130);
   if (chunks.length === 0) return;
 
-  chunks.unshift(`Pocasie pre ${currentDateString}:`);
   for (const message of chunks) {
     await sendAlert(message, channels.weather);
-    await utils.sleep(15 * 1000);
   }
 }
 
@@ -140,11 +137,10 @@ async function getWeather() {
     const weatherEl = document.querySelector('.mp-section');
 
     const situationText = utils.trimAndNormalize(
-      Array.from(weatherEl.childNodes).filter(n => n.nodeType === 3).map(n => n.textContent).join('')
+      Array.from(weatherEl.childNodes).filter(n => n.nodeType === 3).map(n => n.textContent).join(' ')
     );
-    const forecastText = utils.trimAndNormalize(weatherEl.querySelector('p').textContent);
 
-    weather = `${situationText} ${forecastText}`;
+    weather = situationText + ' ' + utils.trimAndNormalize(weatherEl.querySelector('p').textContent) ;
   }
   catch (e) {
     console.error(e)
@@ -207,6 +203,7 @@ async function sendAlert(message, channel) {
     utils.shortenToBytes(message, 155)
   );
   console.log(`Sent out [${channel.name}]: ${message}`);
+  await utils.sleep(30 * 1000);
 }
 
 async function blitzWarning() {

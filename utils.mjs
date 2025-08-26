@@ -52,7 +52,7 @@ export function calculateHeadingAndDistance(myLat, myLon, targetLat, targetLon){
 }
 
 export function trimAndNormalize(str) {
-  return normalizeText(str.replaceAll('\n', '').trim())
+  return normalizeText(str.replaceAll(/[\n\s]+/g, ' ').trim())
 }
 
 export function shortenToBytes(str, maxBytes) {
