@@ -5,7 +5,8 @@ node.js weather bot using meshcore.js and companion-usb
 You will need Meshcore device with Companion USB firmware connected to the computer
 
 ## Installation
-First you need to install node.js >18.0
+1. [Install Node.js 18.0 or higher](https://nodejs.org/en/download/)(most recent LTS recommended)
+2. Clone this repo & install dependencies via npm
 ```sh
 git clone https://github.com/recrof/MeshCore-WeatherBot.git
 cd MeshCore-WeatherBot
@@ -37,14 +38,14 @@ Edit `config.json`:
     "maxLon": 18.62
   },
   "compasNames": { // compass direction names in your local language
-    "N": "Severne",
-    "NE": "Severo-Vychodne",
-    "E": "Vychodne",
-    "SE": "Juho-Vychodne",
-    "S": "Juzne",
-    "SW": "Juho-Zapadne",
-    "W": "Zapadne",
-    "NW": "Severo-Zapadne"
+    "N": "North",
+    "NE": "North-East",
+    "E": "East",
+    "SE": "South-East",
+    "S": "South",
+    "SW": "South-West",
+    "W": "West",
+    "NW": "North-West"
   }
 }
 ```
