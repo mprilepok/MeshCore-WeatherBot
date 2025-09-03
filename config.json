@@ -6,8 +6,8 @@
     "lon": 17.11
   },
   "channels": {
-    "alerts": "ARES",
-    "weather": "Omega"
+    "alerts": "Public",
+    "weather": "Public"
   },
   "timers": {
     "blitzCollection": 600000,
@@ -20,13 +20,13 @@
     "maxLon": 18.62
   },
   "compasNames": {
-    "N": "Severne",
-    "NE": "Severo-Vychodne",
-    "E": "Vychodne",
-    "SE": "Juho-Vychodne",
-    "S": "Juzne",
-    "SW": "Juho-Zapadne",
-    "W": "Zapadne",
-    "NW": "Severo-Zapadne"
+    "N": "North",
+    "NE": "North-East",
+    "E": "East",
+    "SE": "South-East",
+    "S": "South",
+    "SW": "South-West",
+    "W": "West",
+    "NW": "North-West"
   }
 }
