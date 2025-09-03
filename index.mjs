@@ -2,39 +2,9 @@ import { Constants, NodeJSSerialConnection } from "@liamcottle/meshcore.js";
 import { DOMParser } from 'linkedom';
 import * as mqtt from 'mqtt';
 import * as utils from './utils.mjs';
+import config from './config.json' with { type: 'json' };
 
-const port = process.argv[2] ?? '/dev/ttyACM0';
-
-const weatherTime = '6:00';
-const timers = { // miliseconds
-  blitzCollection: 10 * 60 * 1000, // 10 minutes
-  pollWeatherAlerts: 10 * 60 * 1000, // 10 minutes
-};
-
-const blitzArea = {
-  // minLat: 45.0,
-  // maxLon: 27.0,
-  minLat: 47.51,
-  minLon: 15.54,
-  maxLat: 48.76,
-  maxLon: 18.62,
-};
-
-const myPosition = {
-  lat: 48.14,
-  lon: 17.11
-};
-
-const compas8SK = {
-  N: 'Severne',
-  NE: 'Severo-Vychodne',
-  E: 'Vychodne',
-  SE: 'Juho-Vychodne',
-  S: 'Juzne',
-  SW: 'Juho-Zapadne',
-  W: 'Zapadne',
-  NW: 'Severo-Zapadne'
-};
+const port = process.argv[2] ?? config.port;
 
 const channels = {
   alerts: null,
@@ -54,27 +24,21 @@ const connection = new NodeJSSerialConnection(port);
 connection.on('connected', async () => {
   console.log(`Connected to ${port}`);
 
-  channels.alerts = await connection.findChannelByName('ARES');
-  if (!channels.alerts) {
-    console.log('Channel ARES not found!');
-    connection.close();
-    return;
+  for(const [channelType, channel] of Object.entries(config.channels)) {
+    channels[channelType] = await connection.findChannelByName(channel);
+    if (!channels[channelType]) {
+      console.log(`Channel ${channelType}: "${channel}" not found!`);
+      connection.close();
+      return;
+    }
   }
-
-  channels.weather = await connection.findChannelByName('Omega');
-  if (!channels.weather) {
-    console.log('Channel Omega not found!');
-    connection.close();
-    return;
-  }
-
-  // update clock on meshcore device
-  await connection.syncDeviceTime();
 
   await pollWeatherAlerts();
-  await registerBlitzortungMqtt(blitzHandler, blitzArea);
-  utils.setAlarm(weatherTime, sendWeather);
-  setInterval(blitzWarning, timers.blitzCollection);
+  await registerBlitzortungMqtt(blitzHandler, config.blitzArea);
+  utils.setAlarm(config.weatherAlarm, sendWeather);
+  setInterval(blitzWarning, config.timers.blitzCollection);
+
+  console.log('weatherBot ready.');
 });
 
 // listen for new messages
@@ -112,11 +76,10 @@ async function pollWeatherAlerts() {
     seen.warnings[hash] = true;
   }
 
-  setTimeout(pollWeatherAlerts, timers.pollWeatherAlerts);
+  setTimeout(pollWeatherAlerts, config.timers.pollWeatherAlerts);
 }
 
 async function sendWeather(date) {
-  // const currentDateString = date.toLocaleDateString('sk', { weekday: 'long', year: 'numeric', month: 'numeric', day: 'numeric' });
   const chunks = utils.splitStringToByteChunks(await getWeather(), 130);
   if (chunks.length === 0) return;
 
@@ -135,12 +98,13 @@ async function getWeather() {
 
     const document = new DOMParser().parseFromString(html, 'text/html');
     const weatherEl = document.querySelector('.mp-section');
+    const weatherBits = Array.from(weatherEl.childNodes).filter(n => n.nodeType === 3).map(n => n.textContent).filter(t => /\w/.test(t));
 
-    const situationText = utils.trimAndNormalize(
-      Array.from(weatherEl.childNodes).filter(n => n.nodeType === 3).map(n => n.textContent).join(' ')
+    weatherBits.push(
+      ...Array.from(weatherEl.querySelectorAll('p')).map(e => e.textContent).filter(t => !/^Formul|Rozhovor/.test(t))
     );
 
-    weather = situationText + ' ' + utils.trimAndNormalize(weatherEl.querySelector('p').textContent) ;
+    weather = utils.trimAndNormalize(weatherBits.join(' '));
   }
   catch (e) {
     console.error(e)
@@ -193,7 +157,7 @@ async function registerBlitzortungMqtt(blitzCallback, blitzArea) {
 }
 
 function blitzHandler(blitzData) {
-  const blitz = utils.calculateHeadingAndDistance(myPosition.lat, myPosition.lon, blitzData.lat, blitzData.lon);
+  const blitz = utils.calculateHeadingAndDistance(config.myPosition.lat, config.myPosition.lon, blitzData.lat, blitzData.lon);
   blitzBuffer.push(blitz);
 }
 
@@ -221,12 +185,12 @@ async function blitzWarning() {
     const [heading, distance] = key.split('|');
     if (!(heading && distance)) continue;
 
-    messageParts.push(`${distance * 10}km ${compas8SK[heading]}`);
+    messageParts.push(`${distance * 10}km ${config.compasNames[heading]}`);
     seen.blitz[key] = 1;
   }
   if (messageParts.length == 0) return;
 
-  await sendAlert(`[STORM]: ${messageParts.join(', ')}`, channels.alerts);
+  await sendAlert(`🌩️ ${messageParts.join(', ')}`, channels.alerts);
 
   blitzBuffer = [];
 }

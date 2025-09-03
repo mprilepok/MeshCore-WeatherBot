@@ -1,0 +1,32 @@
+{
+  "port": "/dev/ttyACM0",
+  "weatherAlarm": "6:00",
+  "myPosition": {
+    "lat": 48.14,
+    "lon": 17.11
+  },
+  "channels": {
+    "alerts": "ARES",
+    "weather": "Omega"
+  },
+  "timers": {
+    "blitzCollection": 600000,
+    "pollWeatherAlerts": 600000
+  },
+  "blitzArea": {
+    "minLat": 47.51,
+    "minLon": 15.54,
+    "maxLat": 48.76,
+    "maxLon": 18.62
+  },
+  "compasNames": {
+    "N": "Severne",
+    "NE": "Severo-Vychodne",
+    "E": "Vychodne",
+    "SE": "Juho-Vychodne",
+    "S": "Juzne",
+    "SW": "Juho-Zapadne",
+    "W": "Zapadne",
+    "NW": "Severo-Zapadne"
+  }
+}
