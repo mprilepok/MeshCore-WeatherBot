@@ -14,7 +14,8 @@ npm install .
 ```
 
 ## Usage
-Edit `config.json`:
+1. Connect working MeshCore companion usb into computer you want to run WeatherBot on
+2. Edit `config.json`:
 ```json
 {
   "port": "/dev/ttyACM0", // port which is used for companion USB
@@ -49,11 +50,10 @@ Edit `config.json`:
   }
 }
 ```
-then run:
+3. then run:
 ```
 node index.mjs
 ```
-
 
 **Note:**
 This weather bot is currently hardcoded to use weather data from shmu.sk for Bratislava region.
