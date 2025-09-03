@@ -5,7 +5,7 @@ node.js weather bot using meshcore.js and companion-usb
 You will need Meshcore device with Companion USB firmware connected to the computer
 
 ## Installation
-1. [Install Node.js 18.0 or higher](https://nodejs.org/en/download/)(most recent LTS recommended)
+1. [Install Node.js 22 or higher](https://nodejs.org/en/download/)(most recent LTS recommended)
 2. Clone this repo & install dependencies via npm
 ```sh
 git clone https://github.com/recrof/MeshCore-WeatherBot.git
