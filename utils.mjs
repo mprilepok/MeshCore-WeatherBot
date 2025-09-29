@@ -1,11 +1,11 @@
 function bufferToHexString(buffer) {
   return Array.from(new Uint8Array(buffer))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 export function degreesToCompass8(degrees) {
-  const directions  = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 
   const index = Math.round(degrees / 45) % 8;
 
@@ -13,10 +13,10 @@ export function degreesToCompass8(degrees) {
 }
 
 export function normalizeText(text) {
-  return text.normalize('NFD').trim().replaceAll(/[\n\u0300-\u036f]/g,'')
+  return text.normalize('NFD').trim().replaceAll(/[\n\u0300-\u036f]/g, '')
 }
 
-export function calculateHeadingAndDistance(myLat, myLon, targetLat, targetLon){
+export function calculateHeadingAndDistance(myLat, myLon, targetLat, targetLon) {
   const R = 6371;
   const toRadians = (degrees) => degrees * (Math.PI / 180);
   const toDegrees = (radians) => radians * (180 / Math.PI);
@@ -47,8 +47,39 @@ export function calculateHeadingAndDistance(myLat, myLon, targetLat, targetLon){
 
   return {
     heading: degreesToCompass8(heading),
-    distance: R * c,
+    distance: R * c
   };
+}
+
+// https://nominatim.org/release-docs/develop/api/Reverse/
+export function geoCode(lat, lon) {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+
+  return fetch(url)
+    .then(res => {
+      if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
+      return res.json();
+    })
+    .then(json => {
+      if (json.error) return '';
+
+      const address = json.address || {};
+      let location = '';
+
+      if (address.village) location += `${address.village}, `;
+      else if (address.town) location += `${address.town}, `;
+      else if (address.city) location += `${address.city}, `;
+
+      if (address.municipality) location += `${address.municipality}, `;
+      if (address.state) location += `${address.state}, `;
+      if (address.country) location += `${address.country}`;
+
+      return location.replace(/,\s*$/, '');
+    })
+    .catch(err => {
+      console.error('Geocoding failed:', err);
+      return '';
+    });
 }
 
 export function trimAndNormalize(str) {
@@ -113,7 +144,7 @@ export function splitStringToByteChunks(str, maxBytes) {
     if (candidateChunk.length === 0) {
       const oneCharLessBytes = encoded.slice(0, maxBytes - 3); // Assume max 3 bytes for a char
       candidateChunk = decoder.decode(oneCharLessBytes, { stream: true });
-      if(candidateChunk.length === 0) break; // Safety break
+      if (candidateChunk.length === 0) break; // Safety break
     }
 
     let splitIndex = -1;
