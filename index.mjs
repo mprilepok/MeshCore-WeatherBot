@@ -16,6 +16,8 @@ const seen = {
   warnings: {},
 };
 
+let geoCache = {};
+
 let blitzBuffer = [];
 
 console.log(`Connecting to ${port}`);
@@ -24,7 +26,7 @@ const connection = new NodeJSSerialConnection(port);
 connection.on('connected', async () => {
   console.log(`Connected to ${port}`);
 
-  for(const [channelType, channel] of Object.entries(config.channels)) {
+  for (const [channelType, channel] of Object.entries(config.channels)) {
     channels[channelType] = await connection.findChannelByName(channel);
     if (!channels[channelType]) {
       console.log(`Channel ${channelType}: "${channel}" not found!`);
@@ -158,7 +160,14 @@ async function registerBlitzortungMqtt(blitzCallback, blitzArea) {
 
 function blitzHandler(blitzData) {
   const blitz = utils.calculateHeadingAndDistance(config.myPosition.lat, config.myPosition.lon, blitzData.lat, blitzData.lon);
-  blitzBuffer.push(blitz);
+
+  blitzBuffer.push({
+    key: `${blitz.heading}|${(blitz.distance / 10) | 0}`,
+    heading: blitz.heading,
+    distance: blitz.distance,
+    lat: blitzData.lat,
+    lon: blitzData.lon
+  });
 }
 
 async function sendAlert(message, channel) {
@@ -169,28 +178,32 @@ async function sendAlert(message, channel) {
   console.log(`Sent out [${channel.name}]: ${message}`);
   await utils.sleep(30 * 1000);
 }
+async function geoCodeChached(key, lat, lon) {
+  if (geoCache[key]) return geoCache[key];
+  const location = await utils.geoCode(lat, lon);
+  if (location) geoCache[key] = location;
+  return location;
+}
 
 async function blitzWarning() {
   const counter = {};
-  const messageParts = [];
 
   for (const blitz of blitzBuffer) {
-    const key = `${blitz.heading}|${(blitz.distance / 10) | 0}`
-    counter[key] = counter[key] ?? 0;
-    counter[key]++;
+    counter[blitz.key] = counter[blitz.key]++ ?? 1;
   }
 
   for (const key of Object.keys(counter)) {
     if (counter[key] < 10 || seen.blitz[key]) continue;
     const [heading, distance] = key.split('|');
     if (!(heading && distance)) continue;
-
-    messageParts.push(`${distance * 10}km ${config.compasNames[heading]}`);
+    var data = blitzBuffer.find(b => b.key == key);
+    if (!data) continue;
+    const location = await geoCodeChached(key, data.lat, data.lon);
+    if (!location) continue;
+    await sendAlert(`🌩️ ${location} (${distance * 10}km ${config.compasNames[heading]})`, channels.alerts);
     seen.blitz[key] = 1;
   }
-  if (messageParts.length == 0) return;
-
-  await sendAlert(`🌩️ ${messageParts.join(', ')}`, channels.alerts);
+  //if (messageParts.length == 0) return;
 
   blitzBuffer = [];
 }
