@@ -3,6 +3,15 @@ import { DOMParser } from 'linkedom';
 import * as mqtt from 'mqtt';
 import * as utils from './utils.mjs';
 import config from './config.json' with { type: 'json' };
+import Parser from 'rss-parser';
+
+const optionsShort = {
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false
+};
 
 const port = process.argv[2] ?? config.port;
 
@@ -20,6 +29,8 @@ let geoCache = {};
 
 let blitzBuffer = [];
 
+let meteoAlerts = []
+
 console.log(`Connecting to ${port}`);
 const connection = new NodeJSSerialConnection(port);
 
@@ -36,9 +47,14 @@ connection.on('connected', async () => {
   }
 
   await pollWeatherAlerts();
+
   await registerBlitzortungMqtt(blitzHandler, config.blitzArea);
   utils.setAlarm(config.weatherAlarm, sendWeather);
   setInterval(blitzWarning, config.timers.blitzCollection);
+
+  if (config.meteoAlerts.enabled) {
+    setInterval(checkMeteoAlerts, config.timers.meteoAlerts);
+  }
 
   console.log('weatherBot ready.');
 });
@@ -58,6 +74,67 @@ connection.on(Constants.PushCodes.MsgWaiting, async () => {
     console.log(e);
   }
 });
+
+async function checkMeteoAlerts() {
+  Object.keys(meteoAlerts).forEach(key => {
+    if (meteoAlerts[key] < Date.now() - (config.meteoAlerts.timeout * 60 * 1000)) {
+      delete meteoAlerts[key];
+    }
+  });
+
+  let parser = new Parser({
+    headers: { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9' },
+    xml2jsOptions: {
+      explicitArray: false,
+    },
+    customFields: {
+      item: [
+        ['cap:areaDesc', 'area'],
+        ['cap:event', 'event'],
+        ['cap:certainty', 'certainty'],
+        ['cap:severity', 'severity'],
+        ['cap:expires', 'end'],
+        ['cap:identifier', 'identifier'],
+        ['cap:onset', 'start']
+      ]
+    }
+  });
+  let warnigs = [];
+  const feed = await parser.parseURL(config.meteoAlerts.url);
+  if (feed.items && feed.items.length > 0) {
+    feed.items.forEach((item) => {
+      if (config.meteoAlerts.regions.includes(item.area)) {
+
+        if (meteoAlerts[item.identifier]) return;
+
+        warnigs.push({
+          id: item.identifier,
+          region: item.area,
+          certainty: config.meteoAlerts.certainty[item.certainty.toLowerCase()],
+          severity: config.meteoAlerts.severity[item.severity.toLowerCase()],
+          event: item.event,
+          start: item.start,
+          end: item.end
+        });
+      }
+    });
+  }
+
+  if (warnigs.length > 0) {
+    const sorted = warnigs.sort((a, b) => new Date(a.start) - new Date(b.start));
+    sorted.forEach(item => {
+      const message = `${item.region} ${formatDate(item.start)} - ${formatDate(item.end)}\n${item.event}\nCertainty: ${item.certainty}, Severity: ${item.severity}`;
+      sendAlert(message, channels.weather);
+      meteoAlerts[item.id] = Date.now();
+      utils.sleep(30 * 1000);
+    });
+  }
+}
+function formatDate(date) {
+
+  const dt = new Date(date);
+  return dt.toLocaleString("sk-SK", optionsShort)
+}
 
 async function onContactMessageReceived(message) {
   console.log('Received contact message', message);
@@ -203,7 +280,6 @@ async function blitzWarning() {
     await sendAlert(`🌩️ ${location} (${distance * 10}km ${config.compasNames[heading]})`, channels.alerts);
     seen.blitz[key] = 1;
   }
-  //if (messageParts.length == 0) return;
 
   blitzBuffer = [];
 }
