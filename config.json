@@ -32,11 +32,12 @@
   },
   "meteoAlerts": {
     "enabled": true,
-    "timeout": 60,
+    "timeout": 180,
     "url": "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-slovakia",
     "regions": [
       "Bratislava"
     ],
+    "messageTemplate": "{region} {start} - {end}\n{event}\nSeverity: {severity}, Certainty: {certainty}",
     "severity": {
       "unknown": "Unknown",
       "minor": "Minor",
@@ -50,6 +51,22 @@
       "possible": "Possible (<= 50%)",
       "unlikely": "Unlikely (~ 0%)",
       "unknown": "Unknown"
+    },
+    "events": {
+      "wind": "Wind",
+      "snoworice": "Snow or Ice",
+      "thunderstorm": "Thunderstorm",
+      "fog": "Fog",
+      "hightemperature": "High Temperature",
+      "lowtemperature": "Low Temperature",      
+      "coastalevent": "Coastal Event",
+      "forestfire": "Forest Fire",
+      "avalanche": "Avalanche",
+      "rain": "Rain",
+      "flood": "Flood ",
+      "rainflood": "Rain Flood",
+      "marinehazard": "Marine Hazard ",
+      "drought": "Drought "
     }
   }
 }
