@@ -3,6 +3,15 @@ import { DOMParser } from 'linkedom';
 import * as mqtt from 'mqtt';
 import * as utils from './utils.mjs';
 import config from './config.json' with { type: 'json' };
+import Parser from 'rss-parser';
+
+const optionsShort = {
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false
+};
 
 const port = process.argv[2] ?? config.port;
 
@@ -20,6 +29,8 @@ let geoCache = {};
 
 let blitzBuffer = [];
 
+let meteoAlerts = []
+
 console.log(`Connecting to ${port}`);
 const connection = new NodeJSSerialConnection(port);
 
@@ -35,10 +46,14 @@ connection.on('connected', async () => {
     }
   }
 
-  await pollWeatherAlerts();
   await registerBlitzortungMqtt(blitzHandler, config.blitzArea);
   utils.setAlarm(config.weatherAlarm, sendWeather);
   setInterval(blitzWarning, config.timers.blitzCollection);
+
+  if (config.meteoAlerts.enabled) {
+    setInterval(checkMeteoAlerts, config.timers.meteoAlerts);
+    checkMeteoAlerts();
+  }
 
   console.log('weatherBot ready.');
 });
@@ -59,26 +74,97 @@ connection.on(Constants.PushCodes.MsgWaiting, async () => {
   }
 });
 
+async function checkMeteoAlerts() {
+  Object.keys(meteoAlerts).forEach(key => {
+    if (meteoAlerts[key] < Date.now() - (config.meteoAlerts.timeout * 60 * 1000)) {
+      delete meteoAlerts[key];
+    }
+  });
+
+  let parser = new Parser({
+    headers: { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9' },
+    xml2jsOptions: {
+      explicitArray: false,
+    },
+    customFields: {
+      item: [
+        ['cap:areaDesc', 'area'],
+        ['cap:event', 'event'],
+        ['cap:certainty', 'certainty'],
+        ['cap:severity', 'severity'],
+        ['cap:expires', 'end'],
+        ['cap:identifier', 'identifier'],
+        ['cap:onset', 'start']
+      ]
+    }
+  });
+  let warnigs = [];
+  const feed = await parser.parseURL(config.meteoAlerts.url);
+  if (feed.items && feed.items.length > 0) {
+    feed.items.forEach((item) => {
+      if (config.meteoAlerts.regions.includes(item.area)) {
+        const endTime = new Date(item.end);
+
+        if (endTime < Date.now()) 
+          return;
+
+        if (meteoAlerts[item.identifier])
+          return;
+
+        warnigs.push({
+          id: item.identifier,
+          region: item.area,
+          certainty: item.certainty,
+          severity: item.severity,
+          event: parseEvent(item.event),
+          start: item.start,
+          end: item.end
+        });
+      }
+    });
+  }
+
+  if (warnigs.length > 0) {
+    const sorted = warnigs.sort((a, b) => new Date(a.start) - new Date(b.start));
+    sorted.forEach(item => {
+      const message = interpolate(config.meteoAlerts.messageTemplate, {
+        region: item.region,
+        start: formatDate(item.start),
+        end: formatDate(item.end),
+        event: config.meteoAlerts.events[item.event] ?? item.event,
+        severity: config.meteoAlerts.severity[item.severity.toLowerCase()],
+        certainty: config.meteoAlerts.certainty[item.certainty.toLowerCase()]
+      });
+      sendAlert(message, channels.weather);
+      meteoAlerts[item.id] = Date.now();
+      utils.sleep(30 * 1000);
+    });
+  }
+}
+
+function interpolate(str, data) {
+  return str.replace(/\{([^}]+)\}/g, (_, key) => {
+    return data[key] ?? "";
+  });
+}
+
+function parseEvent(event) {
+  const start = event.indexOf(' ');
+  const end = event.lastIndexOf(' ');
+  return event.substring(start + 1, end).trim().toLowerCase().replace('-', '');
+}
+
+function formatDate(date) {
+  const dt = new Date(date);
+  return dt.toLocaleString("sk-SK", optionsShort)
+}
+
 async function onContactMessageReceived(message) {
   console.log('Received contact message', message);
 }
 
 async function onChannelMessageReceived(message) {
   console.log(`Received channel message`, message);
-}
-
-async function pollWeatherAlerts() {
-  const warnings = await getWarnings();
-
-  for (const warning of warnings) {
-    const hash = utils.shaSumHex(`${warning.type}_${warning.severity}_${warning.startTime}_${warning.endTime}`);
-    if (seen.warnings[hash]) continue;
-
-    await sendAlert(`[${warning.severity}][${warning.type}]: ${warning.text}`, channels.alerts);
-    seen.warnings[hash] = true;
-  }
-
-  setTimeout(pollWeatherAlerts, config.timers.pollWeatherAlerts);
 }
 
 async function sendWeather(date) {
@@ -113,34 +199,6 @@ async function getWeather() {
   }
 
   return weather;
-}
-
-async function getWarnings() {
-  const warnings = [];
-
-  try {
-    const res = await fetch('https://www.meteoblue.com/sk/počasie/warnings/bratislava_slovensko_3060972');
-    const html = await res.text();
-    console.debug(`downloaded ${html.length} bytes from meteoblue.com`);
-    const document = new DOMParser().parseFromString(html, 'text/html');
-    //console.debug(document);
-
-    for (const warnEl of document.querySelectorAll('.warning-wrapper[defaultlang="sk"]')) {
-      console.debug(warnEl);
-      const glyphClasses = warnEl.querySelector('.warning-logos > .glyph').className.split(' ');
-      const type = glyphClasses.find(c => c.startsWith('warning-type-')).replace('warning-type-', '');
-      const severity = glyphClasses.find(c => c.startsWith('sev-')).replace('sev-', '');
-      const text = warnEl.querySelector('.warning-heading .title').textContent.trim();
-      const [startTime, endTime] = warnEl.querySelector('.warning .times').getAttribute('title').replaceAll(/(Štart|Koniec): /g, '').split('\n');
-
-      warnings.push({ type, severity, text, startTime, endTime });
-    }
-  }
-  catch (e) {
-    console.error(e)
-  }
-
-  return warnings;
 }
 
 async function registerBlitzortungMqtt(blitzCallback, blitzArea) {
@@ -178,6 +236,7 @@ async function sendAlert(message, channel) {
   console.log(`Sent out [${channel.name}]: ${message}`);
   await utils.sleep(30 * 1000);
 }
+
 async function geoCodeChached(key, lat, lon) {
   if (geoCache[key]) return geoCache[key];
   const location = await utils.geoCode(lat, lon);
@@ -203,7 +262,6 @@ async function blitzWarning() {
     await sendAlert(`🌩️ ${location} (${distance * 10}km ${config.compasNames[heading]})`, channels.alerts);
     seen.blitz[key] = 1;
   }
-  //if (messageParts.length == 0) return;
 
   blitzBuffer = [];
 }

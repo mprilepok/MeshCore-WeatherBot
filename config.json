@@ -11,7 +11,8 @@
   },
   "timers": {
     "blitzCollection": 600000,
-    "pollWeatherAlerts": 600000
+    "pollWeatherAlerts": 600000,
+    "meteoAlerts": 600000
   },
   "blitzArea": {
     "minLat": 47.51,
@@ -28,5 +29,44 @@
     "SW": "South-West",
     "W": "West",
     "NW": "North-West"
+  },
+  "meteoAlerts": {
+    "enabled": true,
+    "timeout": 180,
+    "url": "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-slovakia",
+    "regions": [
+      "Bratislava"
+    ],
+    "messageTemplate": "{region} {start} - {end}\n{event}\nSeverity: {severity}, Certainty: {certainty}",
+    "severity": {
+      "unknown": "Unknown",
+      "minor": "Minor",
+      "moderate": "Moderate",
+      "severe": "Severe",
+      "extreme ": "Extreme"
+    },
+    "certainty": {
+      "observed": "Observed",
+      "likely": "Likely (> 50%)",
+      "possible": "Possible (<= 50%)",
+      "unlikely": "Unlikely (~ 0%)",
+      "unknown": "Unknown"
+    },
+    "events": {
+      "wind": "Wind",
+      "snoworice": "Snow or Ice",
+      "thunderstorm": "Thunderstorm",
+      "fog": "Fog",
+      "hightemperature": "High Temperature",
+      "lowtemperature": "Low Temperature",      
+      "coastalevent": "Coastal Event",
+      "forestfire": "Forest Fire",
+      "avalanche": "Avalanche",
+      "rain": "Rain",
+      "flood": "Flood ",
+      "rainflood": "Rain Flood",
+      "marinehazard": "Marine Hazard ",
+      "drought": "Drought "
+    }
   }
 }
