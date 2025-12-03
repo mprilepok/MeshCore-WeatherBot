@@ -30,7 +30,8 @@ npm install .
   },
   "timers": { 
     "blitzCollection": 600000, // how often should we aggregate thunder data for evaluation
-    "meteoAlerts": 600000 // how often should we download weather altert data
+    "meteoAlerts": 600000, // how often should we download weather altert data
+    "meteoAlerts": 600000 // how often should we weather alterts checked
   },
   "blitzArea": { // thunder reporting area. if there is storm detected inside, report it
     "minLat": 47.51,
@@ -51,18 +52,20 @@ npm install .
   "meteoAlerts": { // meteo alarm config sections
     "enabled": true, // enables or disables meteo alarm 
     "timeout": 60, // how long should the warning be muted after sending, in minutes
+    "severityFilter": ["severe", "extreme"], // severity levels which will send 
+    "certaintyFilter": ["likely", "observed"], // certainty levels which will send 
     "url": "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-slovakia", // atom feed with warnings
     "regions": [
       "Bratislava" // list of monitored regions/ areas
     ],
-    "severity": {
+    "severity": { // severity translations
       "unknown": "Unknown",
       "minor": "Minor",
       "moderate": "Moderate",
       "severe": "Severe",
       "extreme ": "Extreme"
     },
-    "certainty": {
+    "certainty": { // ceverity translations
       "observed": "Observed",
       "likely": "Likely (> 50%)",
       "possible": "Possible (<= 50%)",
