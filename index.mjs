@@ -51,8 +51,8 @@ connection.on('connected', async () => {
   setInterval(blitzWarning, config.timers.blitzCollection);
 
   if (config.meteoAlerts.enabled) {
-    await checkMeteoAlerts();
     setInterval(checkMeteoAlerts, config.timers.meteoAlerts);
+    checkMeteoAlerts();
   }
 
   console.log('weatherBot ready.');
@@ -103,15 +103,20 @@ async function checkMeteoAlerts() {
   if (feed.items && feed.items.length > 0) {
     feed.items.forEach((item) => {
       if (config.meteoAlerts.regions.includes(item.area)) {
+        const endTime = new Date(item.end);
 
-        if (meteoAlerts[item.identifier]) return;
+        if (endTime < Date.now()) 
+          return;
+
+        if (meteoAlerts[item.identifier])
+          return;
 
         warnigs.push({
           id: item.identifier,
           region: item.area,
-          certainty: config.meteoAlerts.certainty[item.certainty.toLowerCase()],
-          severity: config.meteoAlerts.severity[item.severity.toLowerCase()],
-          event: item.event,
+          certainty: item.certainty,
+          severity: item.severity,
+          event: parseEvent(item.event),
           start: item.start,
           end: item.end
         });
@@ -122,15 +127,34 @@ async function checkMeteoAlerts() {
   if (warnigs.length > 0) {
     const sorted = warnigs.sort((a, b) => new Date(a.start) - new Date(b.start));
     sorted.forEach(item => {
-      const message = `${item.region} ${formatDate(item.start)} - ${formatDate(item.end)}\n${item.event}\nCertainty: ${item.certainty}, Severity: ${item.severity}`;
+      const message = interpolate(config.meteoAlerts.messageTemplate, {
+        region: item.region,
+        start: formatDate(item.start),
+        end: formatDate(item.end),
+        event: config.meteoAlerts.events[item.event] ?? item.event,
+        severity: config.meteoAlerts.severity[item.severity.toLowerCase()],
+        certainty: config.meteoAlerts.certainty[item.certainty.toLowerCase()]
+      });
       sendAlert(message, channels.weather);
       meteoAlerts[item.id] = Date.now();
       utils.sleep(30 * 1000);
     });
   }
 }
-function formatDate(date) {
 
+function interpolate(str, data) {
+  return str.replace(/\{([^}]+)\}/g, (_, key) => {
+    return data[key] ?? "";
+  });
+}
+
+function parseEvent(event) {
+  const start = event.indexOf(' ');
+  const end = event.lastIndexOf(' ');
+  return event.substring(start + 1, end).trim().toLowerCase().replace('-', '');
+}
+
+function formatDate(date) {
   const dt = new Date(date);
   return dt.toLocaleString("sk-SK", optionsShort)
 }
@@ -212,6 +236,7 @@ async function sendAlert(message, channel) {
   console.log(`Sent out [${channel.name}]: ${message}`);
   await utils.sleep(30 * 1000);
 }
+
 async function geoCodeChached(key, lat, lon) {
   if (geoCache[key]) return geoCache[key];
   const location = await utils.geoCode(lat, lon);
