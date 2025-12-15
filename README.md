@@ -52,8 +52,8 @@ npm install .
   "meteoAlerts": { // meteo alarm config sections
     "enabled": true, // enables or disables meteo alarm 
     "timeout": 60, // how long should the warning be muted after sending, in minutes
-    "severityFilter": ["severe", "extreme"], // severity levels which will send 
-    "certaintyFilter": ["likely", "observed"], // certainty levels which will send 
+    "severityFilter": ["severe", "extreme"], // severity levels which will be send 
+    "certaintyFilter": ["likely", "observed"], // certainty levels which will be send 
     "url": "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-slovakia", // atom feed with warnings
     "regions": [
       "Bratislava" // list of monitored regions/ areas

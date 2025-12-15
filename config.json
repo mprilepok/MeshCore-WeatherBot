@@ -51,7 +51,7 @@
       "minor": "Minor",
       "moderate": "Moderate",
       "severe": "Severe",
-      "extreme ": "Extreme"
+      "extreme": "Extreme"
     },
     "certainty": {
       "observed": "Observed",
